@@ -64,7 +64,7 @@
                 style="width: 180px; height: 180px;"
               />
             </div>
-            <span>CPU: {{ cpuData.value.value }}%</span>
+            <span>CPU: {{ cpuData }}%</span>
           </div>
           <div class="gauge-item">
             <div class="gauge-wrapper">
@@ -75,7 +75,7 @@
                 style="width: 180px; height: 180px;"
               />
             </div>
-            <span>内存: {{ memoryData.value.value }}%</span>
+            <span>内存: {{ memoryData }}%</span>
           </div>
           <div class="gauge-item">
             <div class="gauge-wrapper">
@@ -86,8 +86,27 @@
                 style="width: 180px; height: 180px;"
               />
             </div>
-            <span>磁盘: {{ diskData.value.value }}%</span>
+            <span>磁盘: {{ diskData }}%</span>
           </div>
+        </div>
+      </div>
+
+      <!-- 数据表格 -->
+      <div class="chart-card full-width">
+        <h3>📋 用户活动数据表</h3>
+        <div class="table-controls">
+          <button @click="generateTableData" class="btn table-btn">🎲 生成新数据</button>
+          <button @click="addNewUser" class="btn table-btn">👤 添加用户</button>
+          <button @click="sortByPerformance" class="btn table-btn">📊 按性能排序</button>
+        </div>
+        <VueUiTable
+          :config="tableConfig"
+          :dataset="tableData"
+          :key="'table-' + tableKey"
+        />
+        <div class="chart-info">
+          总用户数: {{ tableData.head ? tableData.body.length : 0 }} 人 |
+          平均性能: {{ averagePerformance.toFixed(1) }}%
         </div>
       </div>
     </div>
@@ -105,6 +124,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 // 强制重新渲染的key
 const chartKey = ref(0)
 const gaugeKey = ref(0)
+const tableKey = ref(0)
 
 // 当前端口（开发环境通常是5173）
 const currentPort = ref(window.location.port || '5173')
@@ -117,18 +137,18 @@ let autoUpdateInterval = null
 
 // 折线图数据
 const lineChartData = ref([
-  { name: '1月', series: [320,300] },
-  { name: '2月', series: [280, 260] },
-  { name: '3月', series: [450, 430] },
-  { name: '4月', series: [520, 500] },
-  { name: '5月', series: [380, 360] },
-  { name: '6月', series: [620, 600] },
-  { name: '7月', series: [590, 570] },
-  { name: '8月', series: [670, 650] },
-  { name: '9月', series: [490, 470] },
-  { name: '10月', series: [720, 700] },
-  { name: '11月', series: [650, 630] },
-  { name: '12月', series: [800, 780] }
+  { x: '1月', y: 320 },
+  { x: '2月', y: 280 },
+  { x: '3月', y: 450 },
+  { x: '4月', y: 520 },
+  { x: '5月', y: 380 },
+  { x: '6月', y: 620 },
+  { x: '7月', y: 590 },
+  { x: '8月', y: 670 },
+  { x: '9月', y: 490 },
+  { x: '10月', y: 720 },
+  { x: '11月', y: 650 },
+  { x: '12月', y: 800 }
 ])
 
 const lineChartConfig = ref({
@@ -154,6 +174,56 @@ const lineChartConfig = ref({
   },
   userOptions: {
     show: true
+  }
+})
+
+// 表格配置
+const tableConfig = ref({
+  style: {
+    fontFamily: 'system-ui, -apple-system, sans-serif',
+    th: {
+      backgroundColor: '#f3f4f6',
+      color: '#374151',
+      outline: 'none',
+      fontSize: '14px',
+      fontWeight: 'bold'
+    },
+    td: {
+      fontSize: '14px',
+      color: '#1f2937',
+      outline: 'none'
+    },
+    table: {
+      th: {
+        backgroundColor: '#f9fafb',
+        color: '#374151',
+        borderColor: '#e5e7eb'
+      },
+      td: {
+        backgroundColor: '#ffffff',
+        color: '#1f2937',
+        borderColor: '#e5e7eb'
+      }
+    }
+  },
+  responsiveBreakpoint: 768,
+  colNames: {
+    id: 'ID',
+    username: '用户名',
+    email: '邮箱',
+    department: '部门',
+    performance: '绩效 (%)',
+    lastLogin: '最后登录',
+    status: '状态'
+  },
+  userOptions: {
+    show: true,
+    buttons: {
+      pdf: true,
+      csv: true,
+      img: true,
+      fullscreen: true
+    }
   }
 })
 
@@ -215,11 +285,51 @@ const barAverage = computed(() => {
   return total / barData.value.length
 })
 
-// 仪表盘数据 - 使用正确的数据格式
-const cpuData = ref({ value: 65 })
-const memoryData = ref({ value: 78 })
-const diskData = ref({ value: 43 })
+// 计算平均绩效
+const averagePerformance = computed(() => {
+  if (!tableData.value.body || tableData.value.body.length === 0) return 0
+  const total = tableData.value.body.reduce((sum, row) => sum + row.performance, 0)
+  return total / tableData.value.body.length
+})
 
+// 仪表盘数据 - 使用正确的数据格式
+const cpuData = ref(65)
+const memoryData = ref(78)
+const diskData = ref(43)
+
+// 表格数据
+const tableData = ref({
+  head: [
+    { name: 'id', label: 'ID' },
+    { name: 'username', label: '用户名' },
+    { name: 'email', label: '邮箱' },
+    { name: 'department', label: '部门' },
+    { name: 'performance', label: '绩效 (%)' },
+    { name: 'lastLogin', label: '最后登录' },
+    { name: 'status', label: '状态' }
+  ],
+  body: []
+})
+
+// 用于生成随机数据的模拟数据
+const sampleUsernames = [
+  '张伟', '李娜', '王芳', '刘强', '陈明', '杨丽', '赵勇', '黄敏',
+  '周杰', '吴琳', '徐涛', '朱慧', '林峰', '何静', '郭亮', '马红',
+  '孙磊', '胡燕', '高飞', '康宁', '梁雪', '韩冰', '龙宇', '石磊'
+]
+
+const sampleDepartments = [
+  '技术部', '市场部', '销售部', '人事部', '财务部', '运营部', '设计部', '产品部'
+]
+
+const sampleDomains = ['gmail.com', '163.com', 'qq.com', 'sina.com', 'outlook.com']
+
+const sampleStatuses = [
+  { label: '在线', color: '#10b981' },
+  { label: '离开', color: '#f59e0b' },
+  { label: '忙碌', color: '#ef4444' },
+  { label: '离线', color: '#6b7280' }
+]
 
 // 仪表盘配置
 const gaugeConfig = ref({
@@ -309,14 +419,16 @@ const diskGaugeConfig = ref({
   }
 })
 
+// 更新仪表盘数据的函数
 const updateGaugeData = async () => {
   const newCpuValue = Math.floor(Math.random() * 100)
   const newMemoryValue = Math.floor(Math.random() * 100)
   const newDiskValue = Math.floor(Math.random() * 100)
 
-  cpuData.value = { value: newCpuValue }
-  memoryData.value = { value: newMemoryValue }
-  diskData.value = { value: newDiskValue }
+  // 更新数据
+  cpuData.value = newCpuValue
+  memoryData.value = newMemoryValue
+  diskData.value = newDiskValue
 
   // 动态更新配置颜色
   gaugeConfig.value.style.gauge.pointer.stroke =
@@ -339,6 +451,70 @@ const updateGaugeData = async () => {
     Memory: newMemoryValue,
     Disk: newDiskValue
   })
+}
+
+// 生成随机用户数据
+const generateRandomUser = (id) => {
+  const username = sampleUsernames[Math.floor(Math.random() * sampleUsernames.length)]
+  const department = sampleDepartments[Math.floor(Math.random() * sampleDepartments.length)]
+  const domain = sampleDomains[Math.floor(Math.random() * sampleDomains.length)]
+  const performance = Math.floor(Math.random() * 40) + 60 // 60-100之间
+  const status = sampleStatuses[Math.floor(Math.random() * sampleStatuses.length)]
+
+  // 生成最后登录时间（1-30天前）
+  const daysAgo = Math.floor(Math.random() * 30) + 1
+  const lastLogin = new Date()
+  lastLogin.setDate(lastLogin.getDate() - daysAgo)
+
+  return {
+    id: id,
+    username: username,
+    email: `${username.toLowerCase().replace(/[^\w]/g, '')}@${domain}`,
+    department: department,
+    performance: performance,
+    lastLogin: lastLogin.toLocaleDateString('zh-CN'),
+    status: status.label,
+    statusColor: status.color
+  }
+}
+
+// 生成表格数据
+const generateTableData = () => {
+  const userCount = Math.floor(Math.random() * 15) + 10 // 10-25个用户
+  const newUsers = []
+
+  for (let i = 1; i <= userCount; i++) {
+    newUsers.push(generateRandomUser(i))
+  }
+
+  tableData.value.body = newUsers
+  tableKey.value++
+
+  console.log('📋 表格数据已生成:', newUsers.length, '个用户')
+}
+
+// 添加新用户
+const addNewUser = () => {
+  const newId = (tableData.value.body?.length || 0) + 1
+  const newUser = generateRandomUser(newId)
+
+  if (!tableData.value.body) {
+    tableData.value.body = []
+  }
+
+  tableData.value.body.push(newUser)
+  tableKey.value++
+
+  console.log('👤 新用户已添加:', newUser.username)
+}
+
+// 按绩效排序
+const sortByPerformance = () => {
+  if (tableData.value.body && tableData.value.body.length > 0) {
+    tableData.value.body.sort((a, b) => b.performance - a.performance)
+    tableKey.value++
+    console.log('📊 已按绩效降序排列')
+  }
 }
 
 // 方法
@@ -364,6 +540,11 @@ const refreshData = async () => {
   // 更新仪表盘
   await updateGaugeData()
 
+  // 更新表格（添加一些新用户）
+  if (Math.random() > 0.5) {
+    addNewUser()
+  }
+
   // 强制重新渲染所有图表
   chartKey.value++
 
@@ -386,7 +567,8 @@ const exportData = () => {
       cpu: cpuData.value,
       memory: memoryData.value,
       disk: diskData.value
-    }
+    },
+    table: tableData.value
   }
 
   const blob = new Blob([JSON.stringify(allData, null, 2)], {
@@ -405,6 +587,9 @@ const exportData = () => {
 // 生命周期钩子
 onMounted(() => {
   console.log('🚀 应用已挂载')
+
+  // 初始化表格数据
+  generateTableData()
 
   // 自动更新仪表盘
   autoUpdateInterval = setInterval(async () => {
@@ -523,6 +708,21 @@ onUnmounted(() => {
   border-radius: 8px;
   color: #6b7280;
   font-weight: 500;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.btn.table-btn {
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  background: linear-gradient(45deg, #6366f1, #4f46e5);
+  border-radius: 20px;
 }
 
 .gauges-container {
