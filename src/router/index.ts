@@ -17,6 +17,36 @@ const router = createRouter({
       // which is lazy-loaded when the route is visited.
       component: () => import('../views/AboutView.vue'),
     },
+    {
+      path: '/treemap',
+      name: 'treemap',
+      component: () => import('../components/TreemapDemo.vue'),
+    },
+    {
+      path: '/line',
+      name: 'line',
+      component: () => import('../views/LineChartPage.vue'),
+    },
+    {
+      path: '/donut',
+      name: 'donut',
+      component: () => import('../views/DonutChartPage.vue'),
+    },
+    {
+      path: '/bar',
+      name: 'bar',
+      component: () => import('../views/BarChartPage.vue'),
+    },
+    {
+      path: '/gauge',
+      name: 'gauge',
+      component: () => import('../views/GaugePage.vue'),
+    },
+    {
+      path: '/table',
+      name: 'table',
+      component: () => import('../views/TablePage.vue'),
+    },
   ],
 })
 
