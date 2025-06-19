@@ -13,24 +13,20 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { VueUiTable } from 'vue-data-ui'
-const tableData = ref({
-  head: [
-    { name: 'id', label: 'ID' },
-    { name: 'name', label: '姓名' },
-    { name: 'age', label: '年龄' },
-    { name: 'email', label: '邮箱' },
-    { name: 'status', label: '状态' },
-    { name: 'performance', label: '性能' }
-  ],
-  body: Array.from({ length: 10 }).map((_, i) => ({
-    id: i + 1,
-    name: `用户${i + 1}`,
-    age: Math.floor(Math.random() * 30) + 20,
-    email: `user${i + 1}@example.com`,
-    status: Math.random() > 0.5 ? '活跃' : '离线',
-    performance: Math.floor(Math.random() * 40) + 60
-  }))
-})
+const tableData = ref(Array.from({ length: 10 }).map((_, i) => ({
+  id: i + 1,
+  name: `用户${i + 1}`,
+  age: Math.floor(Math.random() * 30) + 20,
+  email: `user${i + 1}@example.com`,
+  status: Math.random() > 0.5 ? '活跃' : '离线',
+  performance: Math.floor(Math.random() * 40) + 60
+})))
+// 数据清洗，确保所有字段都不是 undefined
+for (const row of tableData.value as Record<string, string | number>[]) {
+  Object.keys(row).forEach(key => {
+    if (row[key] === undefined) row[key] = ''
+  })
+}
 const tableConfig = ref({
   style: {
     fontFamily: 'system-ui, -apple-system, sans-serif',
@@ -55,11 +51,11 @@ const tableConfig = ref({
     buttons: { pdf: true, csv: true, img: true, fullscreen: true }
   }
 })
-const totalUsers = computed(() => tableData.value?.body?.length || 0)
+const totalUsers = computed(() => tableData.value?.length || 0)
 const averagePerformance = computed(() => {
-  if (!tableData.value?.body || tableData.value.body.length === 0) return 0
-  const total = tableData.value.body.reduce((sum, row) => sum + (row.performance || 0), 0)
-  return total / tableData.value.body.length
+  if (!tableData.value || tableData.value.length === 0) return 0
+  const total = tableData.value.reduce((sum, row) => sum + (row.performance || 0), 0)
+  return total / tableData.value.length
 })
 </script>
 <style scoped>
