@@ -122,50 +122,106 @@
           </div>
 
           <div class="config-card">
-          <form @submit.prevent="saveMonitorRules" class="monitor-form">
-            <!-- Email Address Configuration -->
-            <div class="form-group">
-              <label class="form-label">
-                <span class="label-icon">📧</span>
-                Alert Email Addresses
-                <span class="label-hint">(Add multiple recipients)</span>
-              </label>
-              <div class="email-list">
-                <div
-                  v-for="(email, index) in monitorRules.emails"
-                  :key="index"
-                  class="email-item"
-                >
-                  <input
-                    v-model="monitorRules.emails[index]"
-                    type="email"
-                    class="form-input"
-                    :placeholder="`Recipient ${index + 1} (e.g., user${index + 1}@example.com)`"
-                    required
-                  />
+          <!-- Active Rules Summary -->
+          <div class="active-rules-section">
+            <h4 class="section-subtitle">
+              <span class="label-icon">📋</span>
+              Active Rules Summary
+            </h4>
+            <div class="rules-list">
+              <!-- File Count Threshold Rule -->
+              <div class="rule-item" :class="{ disabled: !monitorRules.enabled }">
+                <div class="rule-info">
+                  <div class="rule-header">
+                    <span class="rule-name">File Count Threshold</span>
+                    <span class="rule-status" :class="monitorRules.enabled ? 'status-active' : 'status-inactive'">
+                      {{ monitorRules.enabled ? '✓ Active' : '✗ Inactive' }}
+                    </span>
+                  </div>
+                  <div class="rule-details">
+                    Alert when daily file count is below <strong>{{ monitorRules.threshold }}</strong>
+                  </div>
+                  <div class="rule-emails" v-if="monitorRules.thresholdEmails && monitorRules.thresholdEmails.filter(e => e.trim()).length > 0">
+                    <span class="email-label">📧 Recipients:</span>
+                    <div class="email-list-display">
+                      <span
+                        v-for="(email, emailIdx) in monitorRules.thresholdEmails.filter(e => e.trim())"
+                        :key="emailIdx"
+                        class="email-badge"
+                      >
+                        {{ email }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <label class="rule-switch">
+                  <input type="checkbox" v-model="monitorRules.enabled" />
+                  <span class="slider-small"></span>
+                </label>
+              </div>
+
+              <!-- File Prefix SLA Rules -->
+              <div
+                v-for="(sla, index) in monitorRules.filePrefixSLAs"
+                :key="index"
+                class="rule-item"
+                :class="{ disabled: !sla.enabled }"
+              >
+                <div class="rule-info">
+                  <div class="rule-header">
+                    <span class="rule-name">
+                      {{ sla.ruleType === 'monthly' ? '📅 Monthly' : '📆 Daily' }} SLA: {{ sla.prefix || 'Unnamed Prefix' }}
+                    </span>
+                    <span class="rule-status" :class="sla.enabled ? 'status-active' : 'status-inactive'">
+                      {{ sla.enabled ? '✓ Active' : '✗ Inactive' }}
+                    </span>
+                  </div>
+                  <div class="rule-details">
+                    <span v-if="sla.ruleType === 'monthly'">
+                      Alert if files with prefix "<strong>{{ sla.prefix || 'prefix' }}</strong>" are not delivered by the <strong>{{ getDayOrdinal(sla.monthlyDay) }}</strong> of each month
+                    </span>
+                    <span v-else>
+                      Alert if files with prefix "<strong>{{ sla.prefix || 'prefix' }}</strong>" are not delivered by <strong>{{ sla.deadlineTime || '23:00' }}</strong>
+                    </span>
+                  </div>
+                  <div class="rule-emails" v-if="sla.emails && sla.emails.filter(e => e.trim()).length > 0">
+                    <span class="email-label">📧 Recipients:</span>
+                    <div class="email-list-display">
+                      <span
+                        v-for="(email, emailIdx) in sla.emails.filter(e => e.trim())"
+                        :key="emailIdx"
+                        class="email-badge"
+                      >
+                        {{ email }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div class="rule-actions">
+                  <label class="rule-switch">
+                    <input type="checkbox" v-model="sla.enabled" />
+                    <span class="slider-small"></span>
+                  </label>
                   <button
                     type="button"
-                    @click="removeEmail(index)"
-                    class="remove-btn"
-                    :title="`Remove email ${index + 1}`"
-                    v-if="monitorRules.emails.length > 1"
+                    @click="confirmDeleteSLA(index)"
+                    class="delete-rule-btn"
+                    title="Delete this rule"
                   >
-                    ✕
+                    <span class="delete-icon">🗑️</span>
                   </button>
                 </div>
               </div>
-              <button
-                type="button"
-                @click="addEmail"
-                class="add-email-btn"
-              >
-                + Add Another Email Address
-              </button>
-              <div class="email-count-hint" v-if="monitorRules.emails.filter(e => e.trim()).length > 0">
-                {{ monitorRules.emails.filter(e => e.trim()).length }} recipient(s) configured
-              </div>
-            </div>
 
+              <div v-if="monitorRules.filePrefixSLAs.length === 0 || !monitorRules.filePrefixSLAs.some(sla => sla.prefix)" class="no-rules-hint">
+                <span class="hint-icon">ℹ️</span>
+                <span>No SLA rules configured. Add rules below to monitor specific file prefixes.</span>
+              </div>
+
+            </div>
+          </div>
+
+          <form @submit.prevent="saveMonitorRules" class="monitor-form">
             <!-- Threshold Configuration -->
             <div class="form-group">
               <label class="form-label">
@@ -182,6 +238,48 @@
                   required
                 />
                 <span class="input-hint">Alert will be sent when daily file count is below this value</span>
+              </div>
+
+              <!-- Email Addresses for Threshold Rule -->
+              <div class="rule-email-config">
+                <label class="form-label email-sub-label">
+                  <span class="label-icon">📧</span>
+                  Alert Email Addresses for this rule
+                  <span class="label-hint">(Add multiple recipients)</span>
+                </label>
+                <div class="email-list">
+                  <div
+                    v-for="(email, index) in monitorRules.thresholdEmails"
+                    :key="index"
+                    class="email-item"
+                  >
+                    <input
+                      v-model="monitorRules.thresholdEmails[index]"
+                      type="email"
+                      class="form-input"
+                      :placeholder="`Recipient ${index + 1} (e.g., user${index + 1}@example.com)`"
+                    />
+                    <button
+                      type="button"
+                      @click="removeThresholdEmail(index)"
+                      class="remove-btn"
+                      :title="`Remove email ${index + 1}`"
+                      v-if="monitorRules.thresholdEmails.length > 1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  @click="addThresholdEmail"
+                  class="add-email-btn"
+                >
+                  + Add Another Email Address
+                </button>
+                <div class="email-count-hint" v-if="monitorRules.thresholdEmails.filter(e => e.trim()).length > 0">
+                  {{ monitorRules.thresholdEmails.filter(e => e.trim()).length }} recipient(s) configured
+                </div>
               </div>
             </div>
 
@@ -234,6 +332,13 @@
                   :key="index"
                   class="sla-item"
                 >
+                  <div class="sla-rule-type">
+                    <label class="rule-type-label">Rule Type:</label>
+                    <select v-model="sla.ruleType" class="form-input rule-type-select">
+                      <option value="daily">Daily Delivery</option>
+                      <option value="monthly">Monthly Delivery</option>
+                    </select>
+                  </div>
                   <div class="sla-inputs">
                     <input
                       v-model="sla.prefix"
@@ -242,12 +347,31 @@
                       placeholder="ABCfile"
                       required
                     />
+                    <!-- Daily rule: time input -->
                     <input
+                      v-if="sla.ruleType === 'daily' || !sla.ruleType"
                       v-model="sla.deadlineTime"
                       type="time"
                       class="form-input sla-time-input"
                       required
                     />
+                    <!-- Monthly rule: day of month input -->
+                    <div v-else class="monthly-day-input-wrapper">
+                      <input
+                        v-model.number="sla.monthlyDay"
+                        type="number"
+                        min="1"
+                        max="31"
+                        class="form-input sla-day-input"
+                        placeholder="5"
+                        required
+                      />
+                      <span class="day-suffix">th day</span>
+                    </div>
+                    <label class="sla-enable-switch" :title="sla.enabled ? 'Disable this rule' : 'Enable this rule'">
+                      <input type="checkbox" v-model="sla.enabled" />
+                      <span class="slider-small"></span>
+                    </label>
                     <button
                       type="button"
                       @click="removeSLA(index)"
@@ -258,9 +382,61 @@
                       ✕
                     </button>
                   </div>
-                  <span class="sla-hint">
-                    Alert if files with prefix "<strong>{{ sla.prefix || 'prefix' }}</strong>" are not delivered by <strong>{{ sla.deadlineTime || '23:00' }}</strong>
-                  </span>
+                  <div class="sla-hint-row">
+                    <span class="sla-hint">
+                      <span v-if="sla.ruleType === 'monthly'">
+                        Alert if files with prefix "<strong>{{ sla.prefix || 'prefix' }}</strong>" are not delivered by the <strong>{{ getDayOrdinal(sla.monthlyDay) }}</strong> of each month
+                      </span>
+                      <span v-else>
+                        Alert if files with prefix "<strong>{{ sla.prefix || 'prefix' }}</strong>" are not delivered by <strong>{{ sla.deadlineTime || '23:00' }}</strong>
+                      </span>
+                    </span>
+                    <span class="sla-status-badge" :class="sla.enabled ? 'badge-enabled' : 'badge-disabled'">
+                      {{ sla.enabled ? 'Enabled' : 'Disabled' }}
+                    </span>
+                  </div>
+
+                  <!-- Email Addresses for SLA Rule -->
+                  <div class="rule-email-config">
+                    <label class="form-label email-sub-label">
+                      <span class="label-icon">📧</span>
+                      Alert Email Addresses for this rule
+                      <span class="label-hint">(Add multiple recipients)</span>
+                    </label>
+                    <div class="email-list">
+                      <div
+                        v-for="(email, emailIndex) in sla.emails"
+                        :key="emailIndex"
+                        class="email-item"
+                      >
+                        <input
+                          v-model="sla.emails[emailIndex]"
+                          type="email"
+                          class="form-input"
+                          :placeholder="`Recipient ${emailIndex + 1} (e.g., user${emailIndex + 1}@example.com)`"
+                        />
+                        <button
+                          type="button"
+                          @click="removeSLAEmail(index, emailIndex)"
+                          class="remove-btn"
+                          :title="`Remove email ${emailIndex + 1}`"
+                          v-if="sla.emails.length > 1"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      @click="addSLAEmail(index)"
+                      class="add-email-btn"
+                    >
+                      + Add Another Email Address
+                    </button>
+                    <div class="email-count-hint" v-if="sla.emails && sla.emails.filter(e => e.trim()).length > 0">
+                      {{ sla.emails.filter(e => e.trim()).length }} recipient(s) configured
+                    </div>
+                  </div>
                 </div>
               </div>
               <button
@@ -327,12 +503,12 @@ const toggleConfig = () => {
 
 // Monitor rules configuration
 const monitorRules = ref({
-  emails: [''],
   threshold: 20,
+  thresholdEmails: [''],
   enabled: true,
   checkInterval: 60,
   filePrefixSLAs: [
-    { prefix: '', deadlineTime: '23:00' }
+    { prefix: '', ruleType: 'daily', deadlineTime: '23:00', monthlyDay: 5, enabled: true, emails: [''] }
   ]
 })
 
@@ -343,13 +519,37 @@ const loadConfig = () => {
     try {
       const config = JSON.parse(saved)
       monitorRules.value = { ...monitorRules.value, ...config }
-      // Ensure emails array is not empty
-      if (!monitorRules.value.emails || monitorRules.value.emails.length === 0) {
-        monitorRules.value.emails = ['']
+      // Ensure thresholdEmails array exists
+      if (!monitorRules.value.thresholdEmails || monitorRules.value.thresholdEmails.length === 0) {
+        // Migrate old emails to thresholdEmails if exists (for backward compatibility)
+        if ('emails' in config && Array.isArray(config.emails) && config.emails.length > 0) {
+          monitorRules.value.thresholdEmails = config.emails as string[]
+        } else {
+          monitorRules.value.thresholdEmails = ['']
+        }
       }
       // Ensure filePrefixSLAs array exists
       if (!monitorRules.value.filePrefixSLAs || monitorRules.value.filePrefixSLAs.length === 0) {
-        monitorRules.value.filePrefixSLAs = [{ prefix: '', deadlineTime: '23:00' }]
+        monitorRules.value.filePrefixSLAs = [{ prefix: '', ruleType: 'daily', deadlineTime: '23:00', monthlyDay: 5, enabled: true, emails: [''] }]
+      } else {
+        // Ensure all SLA rules have required properties
+        monitorRules.value.filePrefixSLAs.forEach(sla => {
+          if (sla.enabled === undefined) {
+            sla.enabled = true
+          }
+          if (sla.ruleType === undefined) {
+            sla.ruleType = 'daily'
+          }
+          if (sla.deadlineTime === undefined && sla.ruleType === 'daily') {
+            sla.deadlineTime = '23:00'
+          }
+          if (sla.monthlyDay === undefined && sla.ruleType === 'monthly') {
+            sla.monthlyDay = 5
+          }
+          if (!sla.emails || sla.emails.length === 0) {
+            sla.emails = ['']
+          }
+        })
       }
     } catch (e) {
       console.error('Failed to load config:', e)
@@ -510,15 +710,21 @@ const generateMockData = () => {
 }
 
 // 发送警报
-const sendAlert = async (message: string) => {
+const sendAlert = async (message: string, emails?: string[]) => {
   try {
+    const emailList = emails || monitorRules.value.thresholdEmails.filter((e: string) => e.trim())
+    if (emailList.length === 0) {
+      console.warn('No email addresses configured for this alert')
+      return
+    }
+
     const response = await fetch(`${API_BASE}/sendalert`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        emails: monitorRules.value.emails.filter(e => e.trim()),
+        emails: emailList,
         message,
         threshold: monitorRules.value.threshold,
         currentCount: todayCount.value
@@ -543,11 +749,16 @@ const checkAndAlert = async () => {
   // Check file count threshold
   if (todayCount.value < monitorRules.value.threshold) {
     const message = `Alert: Today's file delivery count (${todayCount.value}) is below threshold (${monitorRules.value.threshold})`
-    try {
-      await sendAlert(message)
-      console.log('Alert sent successfully')
-    } catch (err) {
-      console.error('Failed to send alert:', err)
+    const emails = monitorRules.value.thresholdEmails.filter((e: string) => e.trim())
+    if (emails.length > 0) {
+      try {
+        await sendAlert(message, emails)
+        console.log('Alert sent successfully')
+      } catch (err) {
+        console.error('Failed to send alert:', err)
+      }
+    } else {
+      console.warn('No email addresses configured for threshold alert')
     }
   }
 
@@ -566,20 +777,67 @@ const checkFilePrefixSLA = async () => {
   const currentTime = `${String(today.getHours()).padStart(2, '0')}:${String(today.getMinutes()).padStart(2, '0')}`
 
   for (const sla of monitorRules.value.filePrefixSLAs) {
-    if (!sla.prefix || !sla.deadlineTime) continue
+    if (!sla.prefix || !sla.enabled) continue
 
-    // Check if deadline has passed
-    if (currentTime >= sla.deadlineTime) {
-      // Check if files with this prefix have been delivered today
-      const expectedFiles = todayFiles.value.filter(file => file.name.startsWith(sla.prefix))
+    // Handle daily rules
+    if (sla.ruleType === 'daily' || !sla.ruleType) {
+      if (!sla.deadlineTime) continue
 
-      if (expectedFiles.length === 0) {
-        const message = `SLA Alert: Files with prefix "${sla.prefix}" were not delivered by ${sla.deadlineTime} on ${todayStr}`
-        try {
-          await sendAlert(message)
-          console.log(`SLA alert sent for prefix: ${sla.prefix}`)
-        } catch (err) {
-          console.error(`Failed to send SLA alert for prefix ${sla.prefix}:`, err)
+      // Check if deadline has passed
+      if (currentTime >= sla.deadlineTime) {
+        // Check if files with this prefix have been delivered today
+        const expectedFiles = todayFiles.value.filter(file => file.name.startsWith(sla.prefix))
+
+        if (expectedFiles.length === 0) {
+          const message = `SLA Alert: Files with prefix "${sla.prefix}" were not delivered by ${sla.deadlineTime} on ${todayStr}`
+          const emails = sla.emails ? sla.emails.filter((e: string) => e.trim()) : []
+          if (emails.length > 0) {
+            try {
+              await sendAlert(message, emails)
+              console.log(`SLA alert sent for prefix: ${sla.prefix}`)
+            } catch (err) {
+              console.error(`Failed to send SLA alert for prefix ${sla.prefix}:`, err)
+            }
+          } else {
+            console.warn(`No email addresses configured for SLA rule: ${sla.prefix}`)
+          }
+        }
+      }
+    }
+    // Handle monthly rules
+    else if (sla.ruleType === 'monthly') {
+      if (!sla.monthlyDay || sla.monthlyDay < 1 || sla.monthlyDay > 31) continue
+
+      const currentDay = today.getDate()
+
+      // Check if we've passed the deadline day of the month
+      if (currentDay >= sla.monthlyDay) {
+        // Check if files with this prefix have been delivered this month
+        const currentMonth = today.getMonth()
+        const currentYear = today.getFullYear()
+        const monthStart = new Date(currentYear, currentMonth, 1)
+
+        // Check files from the start of current month to today
+        const expectedFiles = filesData.value.filter(file => {
+          if (!file.name.startsWith(sla.prefix)) return false
+          const fileDate = new Date(file.date)
+          return fileDate >= monthStart && fileDate <= today
+        })
+
+        if (expectedFiles.length === 0) {
+          const monthName = today.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+          const message = `Monthly SLA Alert: Files with prefix "${sla.prefix}" were not delivered by the ${getDayOrdinal(sla.monthlyDay)} of ${monthName}`
+          const emails = sla.emails ? sla.emails.filter((e: string) => e.trim()) : []
+          if (emails.length > 0) {
+            try {
+              await sendAlert(message, emails)
+              console.log(`Monthly SLA alert sent for prefix: ${sla.prefix}`)
+            } catch (err) {
+              console.error(`Failed to send monthly SLA alert for prefix ${sla.prefix}:`, err)
+            }
+          } else {
+            console.warn(`No email addresses configured for monthly SLA rule: ${sla.prefix}`)
+          }
         }
       }
     }
@@ -618,7 +876,12 @@ const saveMonitorRules = async () => {
 const testAlert = async () => {
   testing.value = true
   try {
-    await sendAlert('This is a test alert message. If you receive this email, the alert system is working correctly.')
+    const emails = monitorRules.value.thresholdEmails.filter((e: string) => e.trim())
+    if (emails.length === 0) {
+      alert('Please configure at least one email address for the threshold rule before testing.')
+      return
+    }
+    await sendAlert('This is a test alert message. If you receive this email, the alert system is working correctly.', emails)
     alert('Test alert sent successfully! Please check your email.')
   } catch {
     alert('Failed to send test alert. Please check API configuration.')
@@ -628,26 +891,90 @@ const testAlert = async () => {
 }
 
 // Add email address
-const addEmail = () => {
-  monitorRules.value.emails.push('')
+// Add email for threshold rule
+const addThresholdEmail = () => {
+  monitorRules.value.thresholdEmails.push('')
 }
 
-// Remove email address
-const removeEmail = (index: number) => {
-  if (monitorRules.value.emails.length > 1) {
-    monitorRules.value.emails.splice(index, 1)
+// Remove email for threshold rule
+const removeThresholdEmail = (index: number) => {
+  if (monitorRules.value.thresholdEmails.length > 1) {
+    monitorRules.value.thresholdEmails.splice(index, 1)
+  }
+}
+
+// Add email for SLA rule
+const addSLAEmail = (slaIndex: number) => {
+  if (!monitorRules.value.filePrefixSLAs[slaIndex].emails) {
+    monitorRules.value.filePrefixSLAs[slaIndex].emails = ['']
+  }
+  monitorRules.value.filePrefixSLAs[slaIndex].emails.push('')
+}
+
+// Remove email for SLA rule
+const removeSLAEmail = (slaIndex: number, emailIndex: number) => {
+  const sla = monitorRules.value.filePrefixSLAs[slaIndex]
+  if (sla.emails && sla.emails.length > 1) {
+    sla.emails.splice(emailIndex, 1)
   }
 }
 
 // Add SLA rule
 const addSLA = () => {
-  monitorRules.value.filePrefixSLAs.push({ prefix: '', deadlineTime: '23:00' })
+  monitorRules.value.filePrefixSLAs.push({
+    prefix: '',
+    ruleType: 'daily',
+    deadlineTime: '23:00',
+    monthlyDay: 5,
+    enabled: true,
+    emails: ['']
+  })
+}
+
+// Get ordinal suffix for day (1st, 2nd, 3rd, 4th, etc.)
+const getDayOrdinal = (day: number | undefined) => {
+  if (!day || day < 1 || day > 31) return '5th'
+  const d = day % 10
+  const suffix = d === 1 && day !== 11 ? 'st' : d === 2 && day !== 12 ? 'nd' : d === 3 && day !== 13 ? 'rd' : 'th'
+  return `${day}${suffix}`
 }
 
 // Remove SLA rule
 const removeSLA = (index: number) => {
-  if (monitorRules.value.filePrefixSLAs.length > 1) {
-    monitorRules.value.filePrefixSLAs.splice(index, 1)
+  // Allow deletion even if it's the last rule
+  monitorRules.value.filePrefixSLAs.splice(index, 1)
+
+  // If no rules left, add a default empty rule
+  if (monitorRules.value.filePrefixSLAs.length === 0) {
+    monitorRules.value.filePrefixSLAs.push({
+      prefix: '',
+      ruleType: 'daily',
+      deadlineTime: '23:00',
+      monthlyDay: 5,
+      enabled: true,
+      emails: ['']
+    })
+  }
+
+  // Auto-save after deletion
+  saveConfig()
+}
+
+// Confirm and delete SLA rule from summary
+const confirmDeleteSLA = (index: number) => {
+  const sla = monitorRules.value.filePrefixSLAs[index]
+  const ruleName = sla.prefix || 'Unnamed Prefix'
+  const ruleType = sla.ruleType === 'monthly' ? 'Monthly' : 'Daily'
+
+  // Check if this is the last rule
+  if (monitorRules.value.filePrefixSLAs.length === 1) {
+    if (confirm(`This is the last SLA rule. Are you sure you want to delete the ${ruleType} SLA rule for prefix "${ruleName}"?\n\nNote: You can always add a new rule later.`)) {
+      removeSLA(index)
+    }
+  } else {
+    if (confirm(`Are you sure you want to delete the ${ruleType} SLA rule for prefix "${ruleName}"?`)) {
+      removeSLA(index)
+    }
   }
 }
 
@@ -1189,15 +1516,384 @@ onUnmounted(() => {
   min-width: 120px;
 }
 
+.sla-rule-type {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.rule-type-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.rule-type-select {
+  flex: 1;
+  max-width: 200px;
+}
+
+.monthly-day-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 120px;
+}
+
+.sla-day-input {
+  flex: 0 0 60px;
+  min-width: 60px;
+}
+
+.day-suffix {
+  font-size: 0.85rem;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
 .sla-hint {
   font-size: 0.85rem;
   color: #6b7280;
   padding-left: 4px;
+  flex: 1;
 }
 
 .sla-hint strong {
   color: #374151;
   font-weight: 600;
+}
+
+.sla-hint-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.sla-status-badge {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge-enabled {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-disabled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.sla-enable-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.sla-enable-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sla-enable-switch .slider-small {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 24px;
+}
+
+.sla-enable-switch .slider-small:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.sla-enable-switch input:checked + .slider-small {
+  background-color: #3b82f6;
+}
+
+.sla-enable-switch input:checked + .slider-small:before {
+  transform: translateX(20px);
+}
+
+/* Active Rules Section */
+.active-rules-section {
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.section-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 16px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rules-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rule-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.rule-item:hover {
+  border-color: #d1d5db;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.rule-item.disabled {
+  background: #f9fafb;
+  opacity: 0.7;
+}
+
+.rule-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.rule-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 12px;
+}
+
+.rule-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.rule-status {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.status-active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rule-details {
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.rule-details strong {
+  color: #374151;
+  font-weight: 600;
+}
+
+.rule-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-left: 16px;
+  min-width: fit-content;
+}
+
+.rule-switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.delete-rule-btn {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: #fee2e2;
+  color: #dc2626;
+  border: 2px solid #fecaca;
+  border-radius: 8px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  line-height: 1;
+  min-width: 36px;
+  min-height: 36px;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.delete-rule-btn:hover {
+  background: #fecaca;
+  border-color: #f87171;
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.2);
+}
+
+.delete-rule-btn:active {
+  transform: scale(0.95);
+}
+
+.delete-icon {
+  display: inline-block;
+  font-size: 1.1rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.rule-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.rule-switch .slider-small {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s;
+  border-radius: 26px;
+}
+
+.rule-switch .slider-small:before {
+  position: absolute;
+  content: "";
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+.rule-switch input:checked + .slider-small {
+  background-color: #3b82f6;
+}
+
+.rule-switch input:checked + .slider-small:before {
+  transform: translateX(24px);
+}
+
+.no-rules-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+.hint-icon {
+  font-size: 1.2rem;
+}
+
+.email-addresses-item {
+  border-left: 4px solid #3b82f6;
+}
+
+.email-list-display {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.email-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.no-email-hint {
+  color: #9ca3af;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.rule-emails {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.email-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.rule-email-config {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.email-sub-label {
+  font-size: 0.9rem;
+  margin-bottom: 8px;
 }
 
 .file-details {
