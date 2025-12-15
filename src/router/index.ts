@@ -52,6 +52,11 @@ const router = createRouter({
       name: 'table-example',
       component: () => import('../views/TableExamplePage.vue'),
     },
+    {
+      path: '/delivery-monitor',
+      name: 'delivery-monitor',
+      component: () => import('../views/DeliveryMonitorPage.vue'),
+    },
   ],
 })
 
