@@ -133,6 +133,7 @@
               <div class="rule-item" :class="{ disabled: !monitorRules.enabled }">
                 <div class="rule-info">
                   <div class="rule-header">
+                    <span class="rule-sequence">Rule {{ ruleSequenceForThreshold }}</span>
                     <span class="rule-name">File Count Threshold</span>
                     <span class="rule-status" :class="monitorRules.enabled ? 'status-active' : 'status-inactive'">
                       {{ monitorRules.enabled ? '✓ Active' : '✗ Inactive' }}
@@ -169,6 +170,7 @@
               >
                 <div class="rule-info">
                   <div class="rule-header">
+                    <span class="rule-sequence">Rule {{ ruleSequenceForSLA(index) }}</span>
                     <span class="rule-name">
                       {{ sla.ruleType === 'monthly' ? '📅 Monthly' : '📆 Daily' }} SLA: {{ sla.prefix || 'Unnamed Prefix' }}
                     </span>
@@ -332,6 +334,7 @@
                   :key="index"
                   class="sla-item"
                 >
+                  <div class="sla-seq">Rule {{ ruleSequenceForSLA(index) }}</div>
                   <div class="sla-rule-type">
                     <label class="rule-type-label">Rule Type:</label>
                     <select v-model="sla.ruleType" class="form-input rule-type-select">
@@ -511,6 +514,29 @@ const monitorRules = ref({
     { prefix: '', ruleType: 'daily', deadlineTime: '23:00', monthlyDay: 5, enabled: true, emails: [''] }
   ]
 })
+
+// Combined rules computed for consistent sequencing (threshold + SLA rules)
+const allRules = computed(() => {
+  const arr: Array<{ kind: 'threshold' | 'sla'; slaIndex?: number }> = []
+  // always include threshold as the first rule
+  arr.push({ kind: 'threshold' })
+  if (monitorRules.value.filePrefixSLAs && monitorRules.value.filePrefixSLAs.length > 0) {
+    monitorRules.value.filePrefixSLAs.forEach((_, i) => arr.push({ kind: 'sla', slaIndex: i }))
+  }
+  return arr
+})
+
+// Return sequence number for threshold (or null if not found)
+const ruleSequenceForThreshold = computed(() => {
+  const idx = allRules.value.findIndex(r => r.kind === 'threshold')
+  return idx >= 0 ? idx + 1 : null
+})
+
+// Return sequence number for SLA by its index in filePrefixSLAs
+const ruleSequenceForSLA = (index: number) => {
+  const idx = allRules.value.findIndex(r => r.kind === 'sla' && r.slaIndex === index)
+  return idx >= 0 ? idx + 1 : null
+}
 
 // Load configuration from localStorage
 const loadConfig = () => {
@@ -2089,6 +2115,25 @@ input:checked + .slider:before {
   left: 0;
   color: #3b82f6;
   font-weight: bold;
+}
+
+/* Rule sequence badge */
+.rule-sequence {
+  display: inline-block;
+  background: #eef2ff;
+  color: #1e3a8a;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.sla-seq {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #374151;
+  margin-bottom: 6px;
 }
 
 /* Transition animations */
