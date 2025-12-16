@@ -142,7 +142,10 @@
                   <div class="rule-details">
                     Alert when daily file count is below <strong>{{ monitorRules.threshold }}</strong>
                   </div>
-                  <div class="rule-emails" v-if="monitorRules.thresholdEmails && monitorRules.thresholdEmails.filter(e => e.trim()).length > 0">
+                  <div
+                    class="rule-emails"
+                    v-if="monitorRules.thresholdEmails && monitorRules.thresholdEmails.filter(e => e.trim()).length > 0"
+                  >
                     <span class="email-label">📧 Recipients:</span>
                     <div class="email-list-display">
                       <span
@@ -155,10 +158,20 @@
                     </div>
                   </div>
                 </div>
-                <label class="rule-switch">
-                  <input type="checkbox" v-model="monitorRules.enabled" />
-                  <span class="slider-small"></span>
-                </label>
+                <div class="rule-actions">
+                  <label class="rule-switch">
+                    <input type="checkbox" v-model="monitorRules.enabled" />
+                    <span class="slider-small"></span>
+                  </label>
+                  <button
+                    type="button"
+                    @click="confirmResetThreshold"
+                    class="delete-rule-btn"
+                    title="Delete this rule"
+                  >
+                    <span class="delete-icon">🗑️</span>
+                  </button>
+                </div>
               </div>
 
               <!-- File Prefix SLA Rules -->
@@ -1001,6 +1014,26 @@ const confirmDeleteSLA = (index: number) => {
     if (confirm(`Are you sure you want to delete the ${ruleType} SLA rule for prefix "${ruleName}"?`)) {
       removeSLA(index)
     }
+  }
+}
+
+// Reset / "delete" the File Count Threshold rule
+const resetThresholdRule = () => {
+  // Reset to default-like values and disable the rule
+  monitorRules.value.threshold = 20
+  monitorRules.value.thresholdEmails = ['']
+  monitorRules.value.enabled = false
+  saveConfig()
+}
+
+// Confirm and reset the threshold rule from summary
+const confirmResetThreshold = () => {
+  if (
+    confirm(
+      'Are you sure you want to delete the File Count Threshold rule?\n\nThis will turn off the monitor and clear all alert email addresses for this rule. You can configure it again later in the form below.'
+    )
+  ) {
+    resetThresholdRule()
   }
 }
 
