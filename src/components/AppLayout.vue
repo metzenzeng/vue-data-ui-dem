@@ -45,6 +45,7 @@ const route = useRoute()
 
 const routes = computed(() => [
   { path: '/', label: 'Home', icon: '🏠' },
+  { path: '/workspace', label: 'Workspace', icon: '💼' },
   { path: '/delivery-monitor', label: 'Delivery Monitor', icon: '📊' },
   { path: '/table', label: 'Table View', icon: '📋' },
   { path: '/table-example', label: 'Table Example', icon: '📑' },

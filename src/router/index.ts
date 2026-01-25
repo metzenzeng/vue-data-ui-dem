@@ -57,6 +57,11 @@ const router = createRouter({
       name: 'delivery-monitor',
       component: () => import('../views/DeliveryMonitorPage.vue'),
     },
+    {
+      path: '/workspace',
+      name: 'workspace',
+      component: () => import('../views/WorkspaceView.vue'),
+    },
   ],
 })
 
